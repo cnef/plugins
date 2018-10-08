@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/rpc"
@@ -60,26 +61,52 @@ func (d *DHCP) Allocate(args *skel.CmdArgs, result *current.Result) error {
 
 	clientID := args.ContainerID + "/" + conf.Name
 	hostNetns := d.hostNetnsPrefix + args.Netns
-	l, err := AcquireLease(clientID, hostNetns, args.IfName)
-	if err != nil {
-		return err
+
+	var dhcpAcquire = func() error {
+
+		l, err := AcquireLease(clientID, hostNetns, args.IfName)
+		if err != nil {
+			return err
+		}
+
+		ipn, err := l.IPNet()
+		if err != nil {
+			l.Stop()
+			return err
+		}
+
+		d.setLease(args.ContainerID, conf.Name, l)
+
+		result.IPs = []*current.IPConfig{{
+			Version: "4",
+			Address: *ipn,
+			Gateway: l.Gateway(),
+		}}
+		result.Routes = l.Routes()
+
+		return nil
 	}
 
-	ipn, err := l.IPNet()
-	if err != nil {
-		l.Stop()
-		return err
+	var defaultAcquire = func() error {
+
+		randIP := fmt.Sprintf("169.254.%d.%d", rand.Intn(255), rand.Intn(254))
+
+		result.IPs = []*current.IPConfig{{
+			Version: "4",
+			Address: net.IPNet{
+				IP:   net.ParseIP(randIP),
+				Mask: net.IPv4Mask(255, 255, 0, 0),
+			},
+			Gateway: net.ParseIP("169.254.0.1"),
+		}}
+
+		return nil
 	}
 
-	d.setLease(args.ContainerID, conf.Name, l)
-
-	result.IPs = []*current.IPConfig{{
-		Version: "4",
-		Address: *ipn,
-		Gateway: l.Gateway(),
-	}}
-	result.Routes = l.Routes()
-
+	if err := dhcpAcquire(); err != nil {
+		fmt.Printf("DHCP AcquireLease failed, Will allocate random IP\n", err)
+		return defaultAcquire()
+	}
 	return nil
 }
 
