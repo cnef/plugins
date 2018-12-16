@@ -51,19 +51,22 @@ func newDHCP() *DHCP {
 	}
 }
 
+func generateClientID(containerID string, netName string, ifName string) string {
+	return containerID + "/" + netName + "/" + ifName
+}
+
 // Allocate acquires an IP from a DHCP server for a specified container.
 // The acquired lease will be maintained until Release() is called.
 func (d *DHCP) Allocate(args *skel.CmdArgs, result *current.Result) error {
+
 	conf := types.NetConf{}
 	if err := json.Unmarshal(args.StdinData, &conf); err != nil {
 		return fmt.Errorf("error parsing netconf: %v", err)
 	}
 
-	clientID := args.ContainerID + "/" + conf.Name
-	hostNetns := d.hostNetnsPrefix + args.Netns
-
 	var dhcpAcquire = func() error {
-
+		clientID := generateClientID(args.ContainerID, conf.Name, args.IfName)
+		hostNetns := d.hostNetnsPrefix + args.Netns
 		l, err := AcquireLease(clientID, hostNetns, args.IfName)
 		if err != nil {
 			return err
@@ -75,7 +78,7 @@ func (d *DHCP) Allocate(args *skel.CmdArgs, result *current.Result) error {
 			return err
 		}
 
-		d.setLease(args.ContainerID, conf.Name, l)
+		d.setLease(clientID, l)
 
 		result.IPs = []*current.IPConfig{{
 			Version: "4",
@@ -88,18 +91,15 @@ func (d *DHCP) Allocate(args *skel.CmdArgs, result *current.Result) error {
 	}
 
 	var defaultAcquire = func() error {
-
-		randIP := fmt.Sprintf("169.254.%d.%d", rand.Intn(255), rand.Intn(254))
-
+		tempIP := fmt.Sprintf("169.254.%d.%d", rand.Intn(255), rand.Intn(254))
 		result.IPs = []*current.IPConfig{{
 			Version: "4",
 			Address: net.IPNet{
-				IP:   net.ParseIP(randIP),
+				IP:   net.ParseIP(tempIP),
 				Mask: net.IPv4Mask(255, 255, 0, 0),
 			},
 			Gateway: net.ParseIP("169.254.0.1"),
 		}}
-
 		return nil
 	}
 
@@ -118,43 +118,45 @@ func (d *DHCP) Release(args *skel.CmdArgs, reply *struct{}) error {
 		return fmt.Errorf("error parsing netconf: %v", err)
 	}
 
-	if l := d.getLease(args.ContainerID, conf.Name); l != nil {
+	clientID := generateClientID(args.ContainerID, conf.Name, args.IfName)
+	if l := d.getLease(clientID); l != nil {
 		l.Stop()
-		d.clearLease(args.ContainerID, conf.Name)
+		d.clearLease(clientID)
 	}
 
 	return nil
 }
 
-func (d *DHCP) getLease(contID, netName string) *DHCPLease {
+func (d *DHCP) getLease(clientID string) *DHCPLease {
 	d.mux.Lock()
 	defer d.mux.Unlock()
 
 	// TODO(eyakubovich): hash it to avoid collisions
-	l, ok := d.leases[contID+netName]
+	l, ok := d.leases[clientID]
 	if !ok {
 		return nil
 	}
 	return l
 }
 
-func (d *DHCP) setLease(contID, netName string, l *DHCPLease) {
+func (d *DHCP) setLease(clientID string, l *DHCPLease) {
 	d.mux.Lock()
 	defer d.mux.Unlock()
 
 	// TODO(eyakubovich): hash it to avoid collisions
-	d.leases[contID+netName] = l
+	d.leases[clientID] = l
 }
 
-func (d *DHCP) clearLease(contID, netName string) {
+//func (d *DHCP) clearLease(contID, netName, ifName string) {
+func (d *DHCP) clearLease(clientID string) {
 	d.mux.Lock()
 	defer d.mux.Unlock()
 
 	// TODO(eyakubovich): hash it to avoid collisions
-	delete(d.leases, contID+netName)
+	delete(d.leases, clientID)
 }
 
-func getListener() (net.Listener, error) {
+func getListener(socketPath string) (net.Listener, error) {
 	l, err := activation.Listeners()
 	if err != nil {
 		return nil, err
@@ -178,7 +180,7 @@ func getListener() (net.Listener, error) {
 	}
 }
 
-func runDaemon(pidfilePath string, hostPrefix string) error {
+func runDaemon(pidfilePath string, hostPrefix string, socketPath string) error {
 	// since other goroutines (on separate threads) will change namespaces,
 	// ensure the RPC server does not get scheduled onto those
 	runtime.LockOSThread()
@@ -193,7 +195,7 @@ func runDaemon(pidfilePath string, hostPrefix string) error {
 		}
 	}
 
-	l, err := getListener()
+	l, err := getListener(socketPath)
 	if err != nil {
 		return fmt.Errorf("Error getting listener: %v", err)
 	}
