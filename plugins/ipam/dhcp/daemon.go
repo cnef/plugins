@@ -34,8 +34,8 @@ import (
 	"github.com/coreos/go-systemd/activation"
 )
 
-const listenFdsStart = 3
-const resendCount = 3
+const listenFdsStart = 10
+const resendCount = 10
 
 var errNoMoreTries = errors.New("no more tries")
 
