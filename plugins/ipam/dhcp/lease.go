@@ -171,7 +171,7 @@ func (l *DHCPLease) commit(ack *dhcp4.Packet) error {
 
 	now := time.Now()
 	l.expireTime = now.Add(leaseTime)
-	l.renewalTime = now.Add(renewalTime)
+	l.renewalTime = now.Add(600*time.Second)
 	l.rebindingTime = now.Add(rebindingTime)
 	l.ack = ack
 	l.opts = opts
@@ -362,7 +362,7 @@ func newDHCPClient(link netlink.Link, clientID string) (*dhcp4client.Client, err
 	return dhcp4client.New(
 		dhcp4client.HardwareAddr(link.Attrs().HardwareAddr),
 		dhcp4client.Timeout(5*time.Second),
-		dhcp4client.Broadcast(false),
+		dhcp4client.Broadcast(true),
 		dhcp4client.Connection(pktsock),
 	)
 }

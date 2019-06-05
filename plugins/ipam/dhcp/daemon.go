@@ -87,6 +87,8 @@ func (d *DHCP) Allocate(args *skel.CmdArgs, result *current.Result) error {
 		}}
 		result.Routes = l.Routes()
 
+		result.DNS = types.DNS{Nameservers: []string{l.Gateway().String()}}
+
 		return nil
 	}
 
