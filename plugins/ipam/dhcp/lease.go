@@ -115,7 +115,7 @@ func (l *DHCPLease) Stop() {
 }
 
 func (l *DHCPLease) acquire() error {
-	c, err := newDHCPClient(l.link, l.clientID)
+	c, err := newDHCPClient(l.link, l.clientID, true)
 	if err != nil {
 		return err
 	}
@@ -241,7 +241,7 @@ func (l *DHCPLease) downIface() {
 }
 
 func (l *DHCPLease) renew() error {
-	c, err := newDHCPClient(l.link, l.clientID)
+	c, err := newDHCPClient(l.link, l.clientID, false)
 	if err != nil {
 		return err
 	}
@@ -262,7 +262,8 @@ func (l *DHCPLease) renew() error {
 		}
 	})
 	if err != nil {
-		return err
+		// TODO always return success as the unicat issue
+		return nil 
 	}
 
 	l.commit(pkt)
@@ -272,7 +273,7 @@ func (l *DHCPLease) renew() error {
 func (l *DHCPLease) release() error {
 	log.Printf("%v: releasing lease", l.clientID)
 
-	c, err := newDHCPClient(l.link, l.clientID)
+	c, err := newDHCPClient(l.link, l.clientID, true)
 	if err != nil {
 		return err
 	}
@@ -353,7 +354,7 @@ func backoffRetry(f func() (*dhcp4.Packet, error)) (*dhcp4.Packet, error) {
 	return nil, errNoMoreTries
 }
 
-func newDHCPClient(link netlink.Link, clientID string) (*dhcp4client.Client, error) {
+func newDHCPClient(link netlink.Link, clientID string, broadcast bool) (*dhcp4client.Client, error) {
 	pktsock, err := dhcp4client.NewPacketSock(link.Attrs().Index)
 	if err != nil {
 		return nil, err
@@ -362,7 +363,7 @@ func newDHCPClient(link netlink.Link, clientID string) (*dhcp4client.Client, err
 	return dhcp4client.New(
 		dhcp4client.HardwareAddr(link.Attrs().HardwareAddr),
 		dhcp4client.Timeout(5*time.Second),
-		dhcp4client.Broadcast(true),
+		dhcp4client.Broadcast(broadcast),
 		dhcp4client.Connection(pktsock),
 	)
 }
