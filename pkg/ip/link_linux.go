@@ -18,8 +18,11 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"hash/fnv"
+	"io/ioutil"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/utils/hwaddr"
@@ -31,12 +34,82 @@ var (
 	ErrLinkNotFound = errors.New("link not found")
 )
 
-func makeVethPair(name, peer string, mtu int) (netlink.Link, error) {
+func writeLog(format string, args ...interface{}) {
+	filename := "/tmp/bridge_debug.txt"
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	if _, err = f.WriteString(fmt.Sprintf(format+"\n", args...)); err != nil {
+		panic(err)
+	}
+}
+
+func generateMacAddress(args string) (net.HardwareAddr, error) {
+
+	pairs := strings.Split(args, ";")
+	values := []string{}
+	for _, p := range pairs {
+		if strings.Index(p, "POD_NAMESPACE") >= 0 || strings.Index(p, "POD_NAME") >= 0 {
+			values = append(values, p)
+		}
+	}
+
+	mac := net.HardwareAddr{
+		2,          // locally administred unicast
+		0x65, 0x02, // OUI (randomly chosen by jell)
+		0, 0, 0, // bytes to randomly overwrite
+	}
+
+	if len(values) == 2 {
+		idBytes, err := ioutil.ReadFile("/etc/machine-id")
+		if err != nil {
+			writeLog("generateMacAddress read file failed: %v", err)
+			return nil, err
+		}
+		id := strings.TrimSpace(strings.Trim(string(idBytes), "\n"))
+		values = append(values, "K8S_HOST_ID="+id)
+
+		fp := strings.Join(values, ";")
+		a := fnv.New32a()
+		a.Write([]byte(fp))
+		bytes := a.Sum(nil)
+
+		writeLog("generateMacAddress fingerprint: %v", fp)
+
+		if len(bytes) == 4 {
+			mac[1] = 0x64
+			mac[2] = bytes[0]
+			mac[3] = bytes[1]
+			mac[4] = bytes[2]
+			mac[5] = bytes[3]
+			return mac, nil
+		}
+	}
+
+	_, err := rand.Reader.Read(mac[3:6])
+	if err != nil {
+		return nil, fmt.Errorf("cannot generate random mac address: %v", err)
+	}
+
+	return mac, nil
+}
+
+func makeVethPair(name, args, peer string, mtu int) (netlink.Link, error) {
+	macAddress, err := generateMacAddress(args)
+	if err != nil {
+		writeLog("generateMacAddress failed, name: %v, peer: %v, args: %v, error: %v", name, peer, args, err)
+		return nil, err
+	}
+	writeLog("name: %v, peer: %v, macAddress: %v, args: %v", name, peer, macAddress, args)
+
 	veth := &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{
-			Name:  name,
-			Flags: net.FlagUp,
-			MTU:   mtu,
+			Name:         name,
+			Flags:        net.FlagUp,
+			HardwareAddr: macAddress,
+			MTU:          mtu,
 		},
 		PeerName: peer,
 	}
@@ -60,14 +133,14 @@ func peerExists(name string) bool {
 	return true
 }
 
-func makeVeth(name string, mtu int) (peerName string, veth netlink.Link, err error) {
+func makeVeth(name, args string, mtu int) (peerName string, veth netlink.Link, err error) {
 	for i := 0; i < 10; i++ {
 		peerName, err = RandomVethName()
 		if err != nil {
 			return
 		}
 
-		veth, err = makeVethPair(name, peerName, mtu)
+		veth, err = makeVethPair(name, args, peerName, mtu)
 		switch {
 		case err == nil:
 			return
@@ -125,8 +198,8 @@ func ifaceFromNetlinkLink(l netlink.Link) net.Interface {
 // Call SetupVeth from inside the container netns.  It will create both veth
 // devices and move the host-side veth into the provided hostNS namespace.
 // On success, SetupVeth returns (hostVeth, containerVeth, nil)
-func SetupVeth(contVethName string, mtu int, hostNS ns.NetNS) (net.Interface, net.Interface, error) {
-	hostVethName, contVeth, err := makeVeth(contVethName, mtu)
+func SetupVeth(contVethName, args string, mtu int, hostNS ns.NetNS) (net.Interface, net.Interface, error) {
+	hostVethName, contVeth, err := makeVeth(contVethName, args, mtu)
 	if err != nil {
 		return net.Interface{}, net.Interface{}, err
 	}

@@ -247,13 +247,13 @@ func ensureBridge(brName string, mtu int, promiscMode bool) (*netlink.Bridge, er
 	return br, nil
 }
 
-func setupVeth(netns ns.NetNS, br *netlink.Bridge, ifName string, mtu int, hairpinMode bool) (*current.Interface, *current.Interface, error) {
+func setupVeth(netns ns.NetNS, br *netlink.Bridge, ifName, args string, mtu int, hairpinMode bool) (*current.Interface, *current.Interface, error) {
 	contIface := &current.Interface{}
 	hostIface := &current.Interface{}
 
 	err := netns.Do(func(hostNS ns.NetNS) error {
 		// create the veth pair in the container and move host end into host netns
-		hostVeth, containerVeth, err := ip.SetupVeth(ifName, mtu, hostNS)
+		hostVeth, containerVeth, err := ip.SetupVeth(ifName, args, mtu, hostNS)
 		if err != nil {
 			return err
 		}
@@ -355,7 +355,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	hostInterface, containerInterface, err := setupVeth(netns, br, args.IfName, n.MTU, n.HairpinMode)
+	hostInterface, containerInterface, err := setupVeth(netns, br, args.IfName, args.Args, n.MTU, n.HairpinMode)
 	if err != nil {
 		return err
 	}
