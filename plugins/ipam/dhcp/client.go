@@ -75,12 +75,21 @@ func DhcpRequest(c *dhcp4client.Client, options dhcp4.Options) (bool, dhcp4.Pack
 	}
 
 	// fix: ack package don't has dns and router option, but it exist in offer package
+	modifiedAckOpts := false
 	offerOptions := offerPacket.ParseOptions()
 	if len(acknowledgementOptions[dhcp4.OptionRouter]) == 0 && len(offerOptions[dhcp4.OptionRouter]) > 0 {
-		acknowledgement.AddOption(dhcp4.OptionRouter, offerOptions[dhcp4.OptionRouter])
+		acknowledgementOptions[dhcp4.OptionRouter] = offerOptions[dhcp4.OptionRouter]
+		modifiedAckOpts = true
 	}
 	if len(acknowledgementOptions[dhcp4.OptionDomainNameServer]) == 0 && len(offerOptions[dhcp4.OptionDomainNameServer]) > 0 {
-		acknowledgement.AddOption(dhcp4.OptionDomainNameServer, offerOptions[dhcp4.OptionDomainNameServer])
+		acknowledgementOptions[dhcp4.OptionDomainNameServer] = offerOptions[dhcp4.OptionDomainNameServer]
+		modifiedAckOpts = true
+	}
+	if modifiedAckOpts {
+		acknowledgement.StripOptions()
+		for opt, val := range acknowledgementOptions {
+			acknowledgement.AddOption(opt, val)
+		}
 	}
 
 	return true, acknowledgement, nil
