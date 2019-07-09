@@ -171,7 +171,7 @@ func (l *DHCPLease) commit(ack *dhcp4.Packet) error {
 
 	now := time.Now()
 	l.expireTime = now.Add(leaseTime)
-	l.renewalTime = now.Add(600*time.Second)
+	l.renewalTime = now.Add(600 * time.Second)
 	l.rebindingTime = now.Add(rebindingTime)
 	l.ack = ack
 	l.opts = opts
@@ -263,7 +263,7 @@ func (l *DHCPLease) renew() error {
 	})
 	if err != nil {
 		// TODO always return success as the unicat issue
-		return nil 
+		return nil
 	}
 
 	l.commit(pkt)
@@ -360,10 +360,14 @@ func newDHCPClient(link netlink.Link, clientID string, broadcast bool) (*dhcp4cl
 		return nil, err
 	}
 
+	// ignore the virtlet internal dhcp server
+	ignoreIps := []net.IP{net.ParseIP("169.254.254.2")}
+
 	return dhcp4client.New(
 		dhcp4client.HardwareAddr(link.Attrs().HardwareAddr),
 		dhcp4client.Timeout(5*time.Second),
 		dhcp4client.Broadcast(broadcast),
 		dhcp4client.Connection(pktsock),
+		dhcp4client.IgnoreServers(ignoreIps),
 	)
 }
