@@ -360,14 +360,10 @@ func newDHCPClient(link netlink.Link, clientID string, broadcast bool) (*dhcp4cl
 		return nil, err
 	}
 
-	// ignore the virtlet internal dhcp server
-	ignoreIps := []net.IP{net.ParseIP("169.254.254.2")}
-
 	return dhcp4client.New(
 		dhcp4client.HardwareAddr(link.Attrs().HardwareAddr),
 		dhcp4client.Timeout(5*time.Second),
 		dhcp4client.Broadcast(broadcast),
 		dhcp4client.Connection(pktsock),
-		dhcp4client.IgnoreServers(ignoreIps),
 	)
 }
