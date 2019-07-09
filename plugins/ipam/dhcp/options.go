@@ -113,6 +113,25 @@ func parseSubnetMask(opts dhcp4.Options) net.IPMask {
 	return net.IPMask(mask)
 }
 
+func parseNameServer(opts dhcp4.Options) types.DNS {
+	fmt.Printf("dhcp opts: %+v \n",opts)
+	dns, ok := opts[dhcp4.OptionDomainNameServer]
+	if !ok {
+		return types.DNS{}
+	}
+	nameservers := []string{}
+
+	for len(dns) >= 4 {
+		s := make([]byte, 4)
+		copy(s, dns[0:4])
+		dns = dns[4:len(dns)]
+		nameservers = append(nameservers, string(s))
+	}
+	fmt.Printf("dhcp nameservers: %+v \n",nameservers)
+	return types.DNS{Nameservers: nameservers}
+}
+
+
 func parseDuration(opts dhcp4.Options, code dhcp4.OptionCode, optName string) (time.Duration, error) {
 	val, ok := opts[code]
 	if !ok {

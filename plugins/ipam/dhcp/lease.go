@@ -305,6 +305,10 @@ func (l *DHCPLease) Gateway() net.IP {
 	return parseRouter(l.opts)
 }
 
+func (l *DHCPLease) NameServer() types.DNS {
+	return parseNameServer(l.opts)
+}
+
 func (l *DHCPLease) Routes() []*types.Route {
 	routes := []*types.Route{}
 
