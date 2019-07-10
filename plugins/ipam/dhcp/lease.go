@@ -130,6 +130,14 @@ func (l *DHCPLease) acquire() error {
 
 	opts := make(dhcp4.Options)
 	opts[dhcp4.OptionClientIdentifier] = []byte(l.clientID)
+	opts[dhcp4.OptionParameterRequestList] = []byte{
+		byte(dhcp4.OptionSubnetMask),
+		byte(dhcp4.OptionDomainName),
+		byte(dhcp4.OptionNameServer),
+		byte(dhcp4.OptionDomainNameServer),
+		byte(dhcp4.OptionRouter),
+		byte(dhcp4.OptionStaticRoute),
+	}
 
 	pkt, err := backoffRetry(func() (*dhcp4.Packet, error) {
 		ok, ack, err := DhcpRequest(c, opts)
@@ -249,6 +257,14 @@ func (l *DHCPLease) renew() error {
 
 	opts := make(dhcp4.Options)
 	opts[dhcp4.OptionClientIdentifier] = []byte(l.clientID)
+	opts[dhcp4.OptionParameterRequestList] = []byte{
+		byte(dhcp4.OptionSubnetMask),
+		byte(dhcp4.OptionDomainName),
+		byte(dhcp4.OptionNameServer),
+		byte(dhcp4.OptionDomainNameServer),
+		byte(dhcp4.OptionRouter),
+		byte(dhcp4.OptionStaticRoute),
+	}
 
 	pkt, err := backoffRetry(func() (*dhcp4.Packet, error) {
 		ok, ack, err := DhcpRenew(c, *l.ack, opts)

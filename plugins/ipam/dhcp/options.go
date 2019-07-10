@@ -17,6 +17,7 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
 	"net"
 	"time"
 
@@ -114,7 +115,7 @@ func parseSubnetMask(opts dhcp4.Options) net.IPMask {
 }
 
 func parseNameServer(opts dhcp4.Options) types.DNS {
-	fmt.Printf("dhcp opts: %+v \n", opts)
+	log.Printf("dhcp opts: %+v", opts)
 	dns, ok := opts[dhcp4.OptionDomainNameServer]
 	if !ok {
 		return types.DNS{}
@@ -127,7 +128,7 @@ func parseNameServer(opts dhcp4.Options) types.DNS {
 		dns = dns[4:len(dns)]
 		nameservers = append(nameservers, net.IP(b).String())
 	}
-	fmt.Printf("dhcp nameservers: %+v \n", nameservers)
+	log.Printf("dhcp nameservers: %+v", nameservers)
 	return types.DNS{Nameservers: nameservers}
 }
 

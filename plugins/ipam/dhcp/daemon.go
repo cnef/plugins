@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net"
 	"net/http"
@@ -89,7 +90,7 @@ func (d *DHCP) Allocate(args *skel.CmdArgs, result *current.Result) error {
 
 		//result.DNS = types.DNS{Nameservers: []string{l.Gateway().String()}}
 		result.DNS = l.NameServer()
-		fmt.Printf("Allocate result: %+v", result)
+		log.Printf("Allocate result: %+v", result)
 
 		return nil
 	}
@@ -108,7 +109,7 @@ func (d *DHCP) Allocate(args *skel.CmdArgs, result *current.Result) error {
 	}
 
 	if err := dhcpAcquire(); err != nil {
-		fmt.Printf("DHCP AcquireLease failed, Will allocate random IP\n", err)
+		log.Printf("DHCP AcquireLease failed, Will allocate random IP", err)
 		return defaultAcquire()
 	}
 	return nil

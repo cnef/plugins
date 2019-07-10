@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/d2g/dhcp4"
 	"github.com/d2g/dhcp4client"
 )
@@ -49,6 +51,7 @@ func DhcpSendDecline(c *dhcp4client.Client, acknowledgementPacket *dhcp4.Packet,
 
 //Lets do a Full DHCP Request.
 func DhcpRequest(c *dhcp4client.Client, options dhcp4.Options) (bool, dhcp4.Packet, error) {
+
 	discoveryPacket, err := DhcpSendDiscoverPacket(c, options)
 	if err != nil {
 		return false, discoveryPacket, err
@@ -74,23 +77,10 @@ func DhcpRequest(c *dhcp4client.Client, options dhcp4.Options) (bool, dhcp4.Pack
 		return false, acknowledgement, nil
 	}
 
-	// fix: ack package don't has dns and router option, but it exist in offer package
-	modifiedAckOpts := false
 	offerOptions := offerPacket.ParseOptions()
-	if len(acknowledgementOptions[dhcp4.OptionRouter]) == 0 && len(offerOptions[dhcp4.OptionRouter]) > 0 {
-		acknowledgementOptions[dhcp4.OptionRouter] = offerOptions[dhcp4.OptionRouter]
-		modifiedAckOpts = true
-	}
-	if len(acknowledgementOptions[dhcp4.OptionDomainNameServer]) == 0 && len(offerOptions[dhcp4.OptionDomainNameServer]) > 0 {
-		acknowledgementOptions[dhcp4.OptionDomainNameServer] = offerOptions[dhcp4.OptionDomainNameServer]
-		modifiedAckOpts = true
-	}
-	if modifiedAckOpts {
-		acknowledgement.StripOptions()
-		for opt, val := range acknowledgementOptions {
-			acknowledgement.AddOption(opt, val)
-		}
-	}
+
+	log.Printf("offer dhcp opts: %+v", offerOptions)
+	log.Printf("ack dhcp opts: %+v", acknowledgementOptions)
 
 	return true, acknowledgement, nil
 }
