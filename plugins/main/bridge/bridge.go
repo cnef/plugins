@@ -387,6 +387,10 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 		result.IPs = ipamResult.IPs
 		result.Routes = ipamResult.Routes
+		// fix: bridge don't have nameservers
+		if len(n.DNS.Nameservers) == 0 {
+			n.DNS = ipamResult.DNS
+		}
 
 		if len(result.IPs) == 0 {
 			return errors.New("IPAM plugin returned missing IP config")
