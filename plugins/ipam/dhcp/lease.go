@@ -116,10 +116,10 @@ func (l *DHCPLease) Stop() {
 
 func (l *DHCPLease) acquire() error {
 	c, err := newDHCPClient(l.link, l.clientID, true)
+	defer c.Close()
 	if err != nil {
 		return err
 	}
-	defer c.Close()
 
 	if (l.link.Attrs().Flags & net.FlagUp) != net.FlagUp {
 		log.Printf("Link %q down. Attempting to set up", l.link.Attrs().Name)
@@ -205,7 +205,6 @@ func (l *DHCPLease) maintain() {
 		case leaseStateRenewing:
 			if err := l.renew(); err != nil {
 				log.Printf("%v: %v", l.clientID, err)
-
 				if time.Now().After(l.rebindingTime) {
 					log.Printf("%v: renawal time expired, rebinding", l.clientID)
 					state = leaseStateRebinding
@@ -250,10 +249,10 @@ func (l *DHCPLease) downIface() {
 
 func (l *DHCPLease) renew() error {
 	c, err := newDHCPClient(l.link, l.clientID, false)
+	defer c.Close()
 	if err != nil {
 		return err
 	}
-	defer c.Close()
 
 	opts := make(dhcp4.Options)
 	opts[dhcp4.OptionClientIdentifier] = []byte(l.clientID)
