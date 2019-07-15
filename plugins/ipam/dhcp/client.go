@@ -1,8 +1,6 @@
 package main
 
 import (
-	"log"
-
 	"github.com/d2g/dhcp4"
 	"github.com/d2g/dhcp4client"
 )
@@ -76,11 +74,6 @@ func DhcpRequest(c *dhcp4client.Client, options dhcp4.Options) (bool, dhcp4.Pack
 	if dhcp4.MessageType(acknowledgementOptions[dhcp4.OptionDHCPMessageType][0]) != dhcp4.ACK {
 		return false, acknowledgement, nil
 	}
-
-	offerOptions := offerPacket.ParseOptions()
-
-	log.Printf("offer dhcp opts: %+v", offerOptions)
-	log.Printf("ack dhcp opts: %+v", acknowledgementOptions)
 
 	return true, acknowledgement, nil
 }

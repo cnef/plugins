@@ -192,6 +192,7 @@ func (l *DHCPLease) maintain() {
 
 	for {
 		var sleepDur time.Duration
+		var sleepRetry = time.Second * 2
 
 		switch state {
 		case leaseStateBound:
@@ -204,7 +205,8 @@ func (l *DHCPLease) maintain() {
 
 		case leaseStateRenewing:
 			if err := l.renew(); err != nil {
-				log.Printf("%v: %v", l.clientID, err)
+				log.Printf("renew %v: %v", l.clientID, err)
+				time.Sleep(sleepRetry)
 
 				if time.Now().After(l.rebindingTime) {
 					log.Printf("%v: renawal time expired, rebinding", l.clientID)
@@ -217,7 +219,8 @@ func (l *DHCPLease) maintain() {
 
 		case leaseStateRebinding:
 			if err := l.acquire(); err != nil {
-				log.Printf("%v: %v", l.clientID, err)
+				log.Printf("acquire %v: %v", l.clientID, err)
+				time.Sleep(sleepRetry)
 
 				if time.Now().After(l.expireTime) {
 					log.Printf("%v: lease expired, bringing interface DOWN", l.clientID)
