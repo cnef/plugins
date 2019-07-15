@@ -41,6 +41,7 @@ func NewPacketSock(ifindex int) (*packetSock, error) {
 	}
 
 	if err = unix.Bind(fd, &addr); err != nil {
+		unix.Close(fd)
 		return nil, err
 	}
 

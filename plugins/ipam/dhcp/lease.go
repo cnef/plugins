@@ -116,11 +116,11 @@ func (l *DHCPLease) Stop() {
 
 func (l *DHCPLease) acquire() error {
 	c, err := newDHCPClient(l.link, l.clientID, true)
-	defer c.Close()
 	if err != nil {
 		return err
 	}
 
+	defer c.Close()
 	if (l.link.Attrs().Flags & net.FlagUp) != net.FlagUp {
 		log.Printf("Link %q down. Attempting to set up", l.link.Attrs().Name)
 		if err = netlink.LinkSetUp(l.link); err != nil {
@@ -192,6 +192,7 @@ func (l *DHCPLease) maintain() {
 
 	for {
 		var sleepDur time.Duration
+		var sleepRetry = time.Second * 2
 
 		switch state {
 		case leaseStateBound:
@@ -204,7 +205,9 @@ func (l *DHCPLease) maintain() {
 
 		case leaseStateRenewing:
 			if err := l.renew(); err != nil {
-				log.Printf("%v: %v", l.clientID, err)
+				log.Printf("renew %v: %v", l.clientID, err)
+				time.Sleep(sleepRetry)
+
 				if time.Now().After(l.rebindingTime) {
 					log.Printf("%v: renawal time expired, rebinding", l.clientID)
 					state = leaseStateRebinding
@@ -216,7 +219,8 @@ func (l *DHCPLease) maintain() {
 
 		case leaseStateRebinding:
 			if err := l.acquire(); err != nil {
-				log.Printf("%v: %v", l.clientID, err)
+				log.Printf("acquire %v: %v", l.clientID, err)
+				time.Sleep(sleepRetry)
 
 				if time.Now().After(l.expireTime) {
 					log.Printf("%v: lease expired, bringing interface DOWN", l.clientID)
@@ -249,11 +253,11 @@ func (l *DHCPLease) downIface() {
 
 func (l *DHCPLease) renew() error {
 	c, err := newDHCPClient(l.link, l.clientID, false)
-	defer c.Close()
 	if err != nil {
 		return err
 	}
 
+	defer c.Close()
 	opts := make(dhcp4.Options)
 	opts[dhcp4.OptionClientIdentifier] = []byte(l.clientID)
 	opts[dhcp4.OptionParameterRequestList] = []byte{
