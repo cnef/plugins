@@ -17,7 +17,9 @@ package main
 import (
 	"fmt"
 	"net"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/containernetworking/plugins/plugins/ipam/host-local/backend/allocator"
 	"github.com/containernetworking/plugins/plugins/ipam/host-local/backend/disk"
@@ -38,13 +40,31 @@ func cmdGet(args *skel.CmdArgs) error {
 	return fmt.Errorf("not implemented")
 }
 
+func writeLog(format string, args ...interface{}) {
+	return
+	filename := "/tmp/debug-cni.txt"
+	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	if _, err = f.WriteString(time.Now().Format("2006-01-02T15:04:05") + fmt.Sprintf(format+"\n", args...)); err != nil {
+		panic(err)
+	}
+}
+
 func cmdAdd(args *skel.CmdArgs) error {
+
 	ipamConf, confVersion, err := allocator.LoadIPAMConfig(args.StdinData, args.Args)
 	if err != nil {
 		return err
 	}
+	writeLog("args: %+v", args)
+	writeLog("stdin: %s", string(args.StdinData))
+	writeLog("ranges: %v", ipamConf.Ranges)
 
 	result := &current.Result{}
+	defer writeLog("result: %v", result)
 
 	if ipamConf.ResolvConf != "" {
 		dns, err := parseResolvConf(ipamConf.ResolvConf)
@@ -71,6 +91,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	for _, ip := range ipamConf.IPArgs {
 		requestedIPs[ip.String()] = ip
 	}
+	writeLog("requestedIPs: %v", requestedIPs)
 
 	for idx, rangeset := range ipamConf.Ranges {
 		allocator := allocator.NewIPAllocator(&rangeset, store, idx)
@@ -78,11 +99,16 @@ func cmdAdd(args *skel.CmdArgs) error {
 		// Check to see if there are any custom IPs requested in this range.
 		var requestedIP net.IP
 		for k, ip := range requestedIPs {
+			writeLog("rangeset: %v", rangeset)
 			if rangeset.Contains(ip) {
+				writeLog("rangeset Contains: %s", ip)
 				requestedIP = ip
 				delete(requestedIPs, k)
 				break
 			}
+		}
+		if len(ipamConf.IPArgs) > 0 && requestedIP == nil {
+			continue
 		}
 
 		ipConf, err := allocator.Get(args.ContainerID, args.IfName, requestedIP)
@@ -93,10 +119,16 @@ func cmdAdd(args *skel.CmdArgs) error {
 			}
 			return fmt.Errorf("failed to allocate for range %d: %v", idx, err)
 		}
+		writeLog("allocator request: %s, conf: %v", requestedIP, ipConf)
 
 		allocs = append(allocs, allocator)
 
-		result.IPs = append(result.IPs, ipConf)
+		if requestedIP != nil {
+			result.IPs = append([]*current.IPConfig{ipConf}, result.IPs...)
+		} else {
+			result.IPs = append(result.IPs, ipConf)
+		}
+		break
 	}
 
 	// If an IP was requested that wasn't fulfilled, fail
