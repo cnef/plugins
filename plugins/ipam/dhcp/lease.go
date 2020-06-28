@@ -129,14 +129,18 @@ func (l *DHCPLease) acquire() error {
 	}
 
 	opts := make(dhcp4.Options)
-	opts[dhcp4.OptionClientIdentifier] = []byte(l.clientID)
+	//opts[dhcp4.OptionClientIdentifier] = []byte(l.clientID)
 	opts[dhcp4.OptionParameterRequestList] = []byte{
 		byte(dhcp4.OptionSubnetMask),
+		byte(dhcp4.OptionTimeOffset),
+		byte(dhcp4.OptionTimeServer),
+		byte(dhcp4.OptionClasslessRouteFormat),
 		byte(dhcp4.OptionDomainName),
-		byte(dhcp4.OptionNameServer),
 		byte(dhcp4.OptionDomainNameServer),
+		byte(dhcp4.OptionInterfaceMTU),
+		byte(dhcp4.OptionNetworkTimeProtocolServers),
+		byte(dhcp4.OptionDomainSearch),
 		byte(dhcp4.OptionRouter),
-		byte(dhcp4.OptionStaticRoute),
 	}
 
 	pkt, err := backoffRetry(func() (*dhcp4.Packet, error) {
@@ -385,7 +389,7 @@ func newDHCPClient(link netlink.Link, clientID string, broadcast bool) (*dhcp4cl
 
 	return dhcp4client.New(
 		dhcp4client.HardwareAddr(link.Attrs().HardwareAddr),
-		dhcp4client.Timeout(5*time.Second),
+		dhcp4client.Timeout(10*time.Second),
 		dhcp4client.Broadcast(broadcast),
 		dhcp4client.Connection(pktsock),
 	)

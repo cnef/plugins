@@ -19,7 +19,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -35,6 +34,7 @@ var (
 )
 
 func writeLog(format string, args ...interface{}) {
+	return
 	filename := "/tmp/bridge_debug.txt"
 	f, err := os.OpenFile(filename, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
@@ -63,14 +63,6 @@ func generateMacAddress(args string) (net.HardwareAddr, error) {
 	}
 
 	if len(values) == 2 {
-		idBytes, err := ioutil.ReadFile("/etc/machine-id")
-		if err != nil {
-			writeLog("generateMacAddress read file failed: %v", err)
-			return nil, err
-		}
-		id := strings.TrimSpace(strings.Trim(string(idBytes), "\n"))
-		values = append(values, "K8S_HOST_ID="+id)
-
 		fp := strings.Join(values, ";")
 		a := fnv.New32a()
 		a.Write([]byte(fp))

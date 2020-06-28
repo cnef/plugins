@@ -1,6 +1,11 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"log"
+	"time"
+
 	"github.com/d2g/dhcp4"
 	"github.com/d2g/dhcp4client"
 )
@@ -34,6 +39,57 @@ func DhcpSendRequest(c *dhcp4client.Client, options dhcp4.Options, offerPacket *
 	return requestPacket, c.SendPacket(requestPacket)
 }
 
+// DhcpDiscoverPacket Send the Discovery Packet to the Broadcast Channel and get Offer package
+func DhcpDiscoverPacket(c *dhcp4client.Client, options dhcp4.Options) (dhcp4.Packet, error) {
+	discoveryPacket := c.DiscoverPacket()
+	for opt, data := range options {
+		discoveryPacket.AddOption(opt, data)
+	}
+	discoveryPacket.PadToMinSize()
+
+	ctx, done := context.WithCancel(context.TODO())
+	defer done()
+
+	recvErrors := make(chan error, 1)
+	var (
+		offerPacket dhcp4.Packet
+		err         error
+	)
+	go func() {
+		offerPacket, err = c.GetOffer(&discoveryPacket)
+		if err != nil {
+			log.Printf("GetOffer failed: %v", err)
+			recvErrors <- err
+			return
+		}
+		recvErrors <- nil
+	}()
+
+	go func() {
+		for {
+			sentErr := c.SendPacket(discoveryPacket)
+			if sentErr != nil {
+				log.Printf("SendPacket failed: %v", err)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Second * 2):
+			}
+		}
+	}()
+
+	select {
+	case err = <-recvErrors:
+		if err != nil {
+			return nil, err
+		}
+	case <-time.After(time.Second * 10):
+		return nil, errors.New("timed out while listening for replies")
+	}
+	return offerPacket, nil
+}
+
 //Send Decline to the received acknowledgement.
 func DhcpSendDecline(c *dhcp4client.Client, acknowledgementPacket *dhcp4.Packet, options dhcp4.Options) (dhcp4.Packet, error) {
 	declinePacket := c.DeclinePacket(acknowledgementPacket)
@@ -50,12 +106,7 @@ func DhcpSendDecline(c *dhcp4client.Client, acknowledgementPacket *dhcp4.Packet,
 //Lets do a Full DHCP Request.
 func DhcpRequest(c *dhcp4client.Client, options dhcp4.Options) (bool, dhcp4.Packet, error) {
 
-	discoveryPacket, err := DhcpSendDiscoverPacket(c, options)
-	if err != nil {
-		return false, discoveryPacket, err
-	}
-
-	offerPacket, err := c.GetOffer(&discoveryPacket)
+	offerPacket, err := DhcpDiscoverPacket(c, options)
 	if err != nil {
 		return false, offerPacket, err
 	}

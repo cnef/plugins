@@ -36,7 +36,7 @@ import (
 )
 
 const listenFdsStart = 10
-const resendCount = 10
+const resendCount = 3
 
 var errNoMoreTries = errors.New("no more tries")
 
@@ -109,7 +109,7 @@ func (d *DHCP) Allocate(args *skel.CmdArgs, result *current.Result) error {
 	}
 
 	if err := dhcpAcquire(); err != nil {
-		log.Printf("DHCP AcquireLease failed, Will allocate random IP", err)
+		log.Printf("DHCP AcquireLease failed, Will allocate random IP: %v", err)
 		return defaultAcquire()
 	}
 	return nil

@@ -114,8 +114,8 @@ const (
 
 	OptionClientArchitecture OptionCode = 93
 
-	OptionTZPOSIXString    OptionCode = 100
-	OptionTZDatabaseString OptionCode = 101
-
+	OptionTZPOSIXString        OptionCode = 100
+	OptionTZDatabaseString     OptionCode = 101
+	OptionDomainSearch         OptionCode = 119
 	OptionClasslessRouteFormat OptionCode = 121
 )
