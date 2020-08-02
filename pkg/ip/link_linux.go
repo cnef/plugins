@@ -162,7 +162,7 @@ func RandomVethName() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random veth name: %v", err)
 	}
-
+	entropy[0] = 255 // ff tag for bridge
 	// NetworkManager (recent versions) will ignore veth devices that start with "veth"
 	return fmt.Sprintf("veth%x", entropy), nil
 }

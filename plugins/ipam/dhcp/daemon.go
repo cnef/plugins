@@ -36,7 +36,7 @@ import (
 )
 
 const listenFdsStart = 10
-const resendCount = 3
+const resendCount = 6
 
 var errNoMoreTries = errors.New("no more tries")
 
