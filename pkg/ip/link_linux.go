@@ -46,7 +46,7 @@ func writeLog(format string, args ...interface{}) {
 	}
 }
 
-func generateMacAddress(args string) (net.HardwareAddr, error) {
+func generateMacAddress(ethName, args string) (net.HardwareAddr, error) {
 
 	pairs := strings.Split(args, ";")
 	values := []string{}
@@ -63,6 +63,9 @@ func generateMacAddress(args string) (net.HardwareAddr, error) {
 	}
 
 	if len(values) == 2 {
+
+		values = append(values, "ETH_NAME="+ethName)
+
 		fp := strings.Join(values, ";")
 		a := fnv.New32a()
 		a.Write([]byte(fp))
@@ -89,7 +92,7 @@ func generateMacAddress(args string) (net.HardwareAddr, error) {
 }
 
 func makeVethPair(name, args, peer string, mtu int) (netlink.Link, error) {
-	macAddress, err := generateMacAddress(args)
+	macAddress, err := generateMacAddress(name, args)
 	if err != nil {
 		writeLog("generateMacAddress failed, name: %v, peer: %v, args: %v, error: %v", name, peer, args, err)
 		return nil, err
